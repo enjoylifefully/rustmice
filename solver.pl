@@ -1,16 +1,12 @@
-% --- 1. DECLARAÇÕES DINÂMICAS ---
-% Declaramos que 'mapa' e 'estado_inicial' serão adicionados em tempo de execução.
+% --- Entradas da grid e player ---
 :- dynamic mapa/2.
 :- dynamic estado_inicial/1.
 
-% --- 2. O ESTADO (Será lido de stdin) ---
-% (estado_inicial(pos(L, C)) será "asserted"
-%  pelo predicado run_solver/0)
 
-% --- 3. REGRAS DE INTERAÇÃO COM O MAPA ---
+
+% --- Regras ---
 
 % tipo_celula(+Posicao, -Tipo)
-% Pega o tipo de célula (c, p, o, j) em uma dada posição pos(L, C).
 tipo_celula(pos(L, C), Tipo) :-
     mapa(L, LinhaLista),      % Encontra a linha
     nth0(C, LinhaLista, Tipo). % Encontra o item na coluna
@@ -26,8 +22,7 @@ pode_entrar(j).  % << NOVO: O ponto inicial ('j') também é caminhável.
 estado_vitoria(Estado) :-
     tipo_celula(Estado, o).
 
-% --- 4. A LÓGICA DE MOVIMENTO (Transição de Estado) ---
-% (Esta seção é IDÊNTICA à sua, não precisa mudar nada)
+% --- Movimento ---
 
 % Mover para Cima
 mover(pos(L, C), cima, NovoEstado) :-
@@ -109,25 +104,23 @@ resolver_com_visitados(EstadoAtual, Visitados, [Acao | RestoDoCaminho]) :-
     % Predicado principal que o Rust irá chamar.
     % (ESTA PARTE É A QUE MUDA)
     run_solver :-
-        read_map,           % 1. Lê o mapa do stdin
+            read_map,
+            findall(Caminho, resolver(Caminho), TodasSolucoes), % Encontra TUDO
 
-        % 2. A MUDANÇA:
-        %    Usa findall/3 para coletar TODAS as soluções de 'resolver(Caminho)'
-        %    em uma única lista chamada 'TodasSolucoes'.
-        findall(Caminho, resolver(Caminho), TodasSolucoes),
+            % 3. Verifica o resultado (MODIFICADO DE VOLTA)
+            (   TodasSolucoes = []
+            ->
+                write('no_solution_found'),
+                nl
+            ;
+                % MODIFICAÇÃO:
+                % Imprime a lista INTEIRA de soluções.
+                % Ex: [[cima, d], [baixo, e]]
+                write(TodasSolucoes),
+                nl
+            ),
 
-        % 3. Verifica o resultado
-        (   TodasSolucoes = []  % Se a lista de soluções estiver vazia
-        ->
-            write('no_solution_found'), % Imprime a falha
-            nl
-        ;
-            % Se houver soluções, imprime a lista inteira de soluções
-            write(TodasSolucoes),
-            nl
-        ),
-
-        halt.               % 4. Termina o processo Prolog
+            halt.
 
     % Define 'run_solver' como o "main" do programa.
     % (ESTA PARTE NÃO MUDA)
