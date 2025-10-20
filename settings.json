@@ -1,0 +1,13 @@
+{
+  "languages": {
+    "Prolog": {
+      "language_servers": [
+        {
+          "name": "prolog-ls",
+          "command": "prolog-ls",
+          "arguments": ["--stdio"]
+        }
+      ]
+    }
+  }
+}
