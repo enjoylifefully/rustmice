@@ -1,127 +1,114 @@
-% --- Entradas da grid e player ---
-:- dynamic mapa/2.
-:- dynamic estado_inicial/1.
+% :- multifile grid/3.
 
+% grid(0, 0, wall).
+% grid(0, 1, wall).
+% grid(0, 2, wall).
+% grid(0, 3, wall).
+% grid(0, 4, wall).
+% grid(1, 0, cheese).
+% grid(1, 1, floor).
+% grid(1, 2, floor).
+% grid(1, 3, cat).
+% grid(1, 4, wall).
+% grid(2, 0, wall).
+% grid(2, 1, floor).
+% grid(2, 2, box).
+% grid(2, 3, wall).
+% grid(2, 4, floor).
+% grid(3, 0, floor).
+% grid(3, 1, cat).
+% grid(3, 2, floor).
+% grid(3, 3, floor).
+% grid(3, 4, floor).
+% grid(4, 0, floor).
+% grid(4, 1, floor).
+% grid(4, 2, floor).
+% grid(4, 3, wall).
+% grid(4, 4, mouse).
 
+initial_state(state(pos(0, 0), 0)).
 
-% --- Regras ---
+cell_type(pos(R, C), Type) :-
+    grid(R, C, Type).
 
-% tipo_celula(+Posicao, -Tipo)
-tipo_celula(pos(L, C), Tipo) :-
-    mapa(L, LinhaLista),      % Encontra a linha
-    nth0(C, LinhaLista, Tipo). % Encontra o item na coluna
+can_enter(floor).
+can_enter(cheese).
+can_enter(box).
 
-% pode_entrar(+TipoDeCelula)
-% Define em quais tipos de célula o jogador pode andar.
-pode_entrar(c).  % Pode andar no 'chão'
-pode_entrar(o).  % Pode andar sobre o 'objetivo'
-pode_entrar(j).  % << NOVO: O ponto inicial ('j') também é caminhável.
+victory_state(state(Pos, _)) :-
+    cell_type(Pos, cheese).
 
-% estado_vitoria(+Estado)
-% O jogo é ganho se o estado atual (posição) for do tipo 'o'.
-estado_vitoria(Estado) :-
-    tipo_celula(Estado, o).
+cat_list(CatList) :-
+    findall(pos(R, C), grid(R, C, cat), CatList).
 
-% --- Movimento ---
+adjacent(pos(R1, C1), pos(R2, C2)) :-
+    abs(R1 - R2) =< 1,
+    abs(C1 - C2) =< 1,
+    (R1 \= R2 ; C1 \= C2).
 
-% Mover para Cima
-mover(pos(L, C), cima, NovoEstado) :-
-    NovaL is L - 1,
-    PosicaoDesejada = pos(NovaL, C),
-    (   once( (tipo_celula(PosicaoDesejada, Tipo), pode_entrar(Tipo)) )
-    ->  NovoEstado = PosicaoDesejada
-    ;   NovoEstado = pos(L, C)
+adjacent_cat(PlayerPos) :-
+    cat_list(Cats),
+    member(CatPos, Cats),
+    adjacent(PlayerPos, CatPos),
+    !.
+
+deadly_state(state(PlayerPos, Timer)) :-
+    Timer > 0,
+    Timer mod 3 =:= 0,
+    adjacent_cat(PlayerPos),
+    cell_type(PlayerPos, Type),
+    Type \= box.
+
+action(up).
+action(down).
+action(left).
+action(right).
+
+calculate_desired_pos(pos(R, C), up,     pos(NR, C)) :- NR is R - 1.
+calculate_desired_pos(pos(R, C), down,   pos(NR, C)) :- NR is R + 1.
+calculate_desired_pos(pos(R, C), left,   pos(R, NC)) :- NC is C - 1.
+calculate_desired_pos(pos(R, C), right,  pos(R, NC)) :- NC is C + 1.
+
+move(state(CurrentPos, CurrentTimer), Action, state(DesiredPos, NewTimer)) :-
+    calculate_desired_pos(CurrentPos, Action, DesiredPos),
+    once((
+        cell_type(DesiredPos, Type),
+        can_enter(Type)
+    )),
+    NewTimer is CurrentTimer + 1.
+
+solve_min_length(K_min) :-
+    initial_state(InitialState),
+    between(1, 30, K_min),
+    solve_with_limit(InitialState, [InitialState], _Path, K_min),
+    !.
+
+solve(Path) :-
+    solve_min_length(K_min),
+    initial_state(InitialState),
+    solve_with_limit(InitialState, [InitialState], Path, K_min).
+
+solve_with_limit(State, _Visited, [], _RemainingLimit) :-
+    victory_state(State).
+
+solve_with_limit(CurrentState, Visited, [Action | Rest], RemainingLimit) :-
+    RemainingLimit > 0,
+    action(Action),
+    move(CurrentState, Action, NextState),
+    \+ deadly_state(NextState),
+    \+ member(NextState, Visited),
+    NewLimit is RemainingLimit - 1,
+    solve_with_limit(NextState, [NextState | Visited], Rest, NewLimit).
+
+all_solutions :-
+    findall(Path, solve(Path), All),
+    (   All = []
+        ->  write('No solution found.')
+    ;   write('Solutions found:'), nl,
+        print_solutions(All)
     ).
 
-% Mover para Baixo
-mover(pos(L, C), baixo, NovoEstado) :-
-    NovaL is L + 1,
-    PosicaoDesejada = pos(NovaL, C),
-    (   once( (tipo_celula(PosicaoDesejada, Tipo), pode_entrar(Tipo)) )
-    ->  NovoEstado = PosicaoDesejada
-    ;   NovoEstado = pos(L, C)
-    ).
-
-% Mover para Direita
-mover(pos(L, C), direita, NovoEstado) :-
-    NovaC is C + 1,
-    PosicaoDesejada = pos(L, NovaC),
-    (   once( (tipo_celula(PosicaoDesejada, Tipo), pode_entrar(Tipo)) )
-    ->  NovoEstado = PosicaoDesejada
-    ;   NovoEstado = pos(L, C)
-    ).
-
-% Mover para Esquerda
-mover(pos(L, C), esquerda, NovoEstado) :-
-    NovaC is C - 1,
-    PosicaoDesejada = pos(L, NovaC),
-    (   once( (tipo_celula(PosicaoDesejada, Tipo), pode_entrar(Tipo)) )
-    ->  NovoEstado = PosicaoDesejada
-    ;   NovoEstado = pos(L, C)
-    ).
-
-%----------------------------------------------------------------------------------------%
-% --- 5. O SOLVER (A "IA") ---
-% (Esta seção é IDÊNTICA à sua)
-
-% Helper para definir as ações possíveis
-acao(cima).
-acao(baixo).
-acao(esquerda).
-acao(direita).
-
-% resolver(-Caminho)
-resolver(Caminho) :-
-    estado_inicial(EstadoInicial),
-    resolver_com_visitados(EstadoInicial, [EstadoInicial], Caminho).
-
-% resolver_com_visitados(+EstadoAtual, +Visitados, -Caminho)
-
-% REGRA 1: CASO BASE (Vitória)
-resolver_com_visitados(Estado, _Visitados, []) :-
-    estado_vitoria(Estado).
-
-% REGRA 2: PASSO RECURSIVO (Movimento)
-resolver_com_visitados(EstadoAtual, Visitados, [Acao | RestoDoCaminho]) :-
-    acao(Acao),
-    mover(EstadoAtual, Acao, ProximoEstado),
-    \+ member(ProximoEstado, Visitados),
-    resolver_com_visitados(ProximoEstado, [ProximoEstado | Visitados], RestoDoCaminho).
-
-    % --- 6. O PONTO DE ENTRADA (MODIFICADO) ---
-
-    % Predicado para ler todos os termos do stdin e "assertá-los"
-    % (ESTA PARTE NÃO MUDA)
-    read_map :-
-        read(Term),         % Lê um termo
-        process_term(Term).
-
-    process_term(end_of_file) :- !. % Para quando a entrada (stdin) fechar
-    process_term(Term) :-
-        assertz(Term),      % Adiciona o fato
-        read_map.           % Continua lendo
-
-    % Predicado principal que o Rust irá chamar.
-    % (ESTA PARTE É A QUE MUDA)
-    run_solver :-
-            read_map,
-            findall(Caminho, resolver(Caminho), TodasSolucoes), % Encontra TUDO
-
-            % 3. Verifica o resultado (MODIFICADO DE VOLTA)
-            (   TodasSolucoes = []
-            ->
-                write('no_solution_found'),
-                nl
-            ;
-                % MODIFICAÇÃO:
-                % Imprime a lista INTEIRA de soluções.
-                % Ex: [[cima, d], [baixo, e]]
-                write(TodasSolucoes),
-                nl
-            ),
-
-            halt.
-
-    % Define 'run_solver' como o "main" do programa.
-    % (ESTA PARTE NÃO MUDA)
-    :- initialization(run_solver, main).
+print_solutions([]).
+print_solutions([H|T]) :-
+    write(H), nl,
+    print_solutions(T).
