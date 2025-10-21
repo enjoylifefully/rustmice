@@ -122,7 +122,7 @@ class GameUI:
                     cell_type = "floor"
 
                 if cell_type == "cat":
-                    if self.current_step_index > 0 and self.current_step_index % 3 == 2:
+                    if self.current_step_index > 0 and self.current_step_index % 3 == 1:
                         key_to_draw = "AngryCat"
                     else:
                         key_to_draw = "cat"
