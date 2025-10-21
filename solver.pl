@@ -1,31 +1,3 @@
-% :- multifile grid/3.
-
-% grid(0, 0, wall).
-% grid(0, 1, wall).
-% grid(0, 2, wall).
-% grid(0, 3, wall).
-% grid(0, 4, wall).
-% grid(1, 0, cheese).
-% grid(1, 1, floor).
-% grid(1, 2, floor).
-% grid(1, 3, cat).
-% grid(1, 4, wall).
-% grid(2, 0, wall).
-% grid(2, 1, floor).
-% grid(2, 2, box).
-% grid(2, 3, wall).
-% grid(2, 4, floor).
-% grid(3, 0, floor).
-% grid(3, 1, cat).
-% grid(3, 2, floor).
-% grid(3, 3, floor).
-% grid(3, 4, floor).
-% grid(4, 0, floor).
-% grid(4, 1, floor).
-% grid(4, 2, floor).
-% grid(4, 3, wall).
-% grid(4, 4, mouse).
-
 initial_state(state(pos(0, 0), 0)).
 
 cell_type(pos(R, C), Type) :-
@@ -47,17 +19,18 @@ adjacent(pos(R1, C1), pos(R2, C2)) :-
     (R1 \= R2 ; C1 \= C2).
 
 adjacent_cat(PlayerPos) :-
-    cat_list(Cats),
-    member(CatPos, Cats),
-    adjacent(PlayerPos, CatPos),
+    grid(CatR, CatC, cat),
+    adjacent(PlayerPos, pos(CatR, CatC)),
     !.
 
-deadly_state(state(PlayerPos, Timer)) :-
+deadly_state(State) :-
+    State = state(PlayerPos, Timer),
     Timer > 0,
     Timer mod 3 =:= 0,
     adjacent_cat(PlayerPos),
     cell_type(PlayerPos, Type),
-    Type \= box.
+    Type \= box,
+    \+ victory_state(State).
 
 action(up).
 action(down).
