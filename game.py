@@ -83,6 +83,7 @@ class GameUI:
             "wall": "Wall.png",
             "floor": "Floor.png",
             "AngryCat": "AngryCat.png",
+            "AttackCat": "AttackCat.png",
             "BoxRat": "BoxRat.png",
             "CheeseRat": "CheeseRat.png",
         }
@@ -122,10 +123,13 @@ class GameUI:
                     cell_type = "floor"
 
                 if cell_type == "cat":
-                    if self.current_step_index > 0 and self.current_step_index % 3 == 1:
-                        key_to_draw = "AngryCat"
-                    else:
-                        key_to_draw = "cat"
+                    match self.current_step_index % 3:
+                        case 0:
+                            key_to_draw = "cat"
+                        case 1:
+                            key_to_draw = "AngryCat"
+                        case 2:
+                            key_to_draw = "AttackCat"
 
                 elif cell_type == "box":
                     key_to_draw = "box"

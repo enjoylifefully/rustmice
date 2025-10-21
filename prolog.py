@@ -3,7 +3,7 @@ from random import randint
 
 
 def generate_grid():
-    side = randint(7, 10)
+    side = randint(6, 10)
     grid = [["floor" for _ in range(side)] for _ in range(side)]
 
     for i in range(side):
@@ -14,7 +14,7 @@ def generate_grid():
             elif i == side - 1 and j == side - 1:
                 cell = "cheese"
             else:
-                match randint(0, 8):
+                match randint(0, 10):
                     case 0:
                         cell = "wall"
                     case 1:
