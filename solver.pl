@@ -25,8 +25,8 @@ adjacent_cat(PlayerPos) :-
 
 deadly_state(State) :-
     State = state(PlayerPos, Timer),
-    Timer > 0,
-    Timer mod 3 =:= 0,
+    % Timer > 0,
+    Timer mod 3 =:= 2,
     adjacent_cat(PlayerPos),
     cell_type(PlayerPos, Type),
     Type \= box,
@@ -48,7 +48,7 @@ move(state(CurrentPos, CurrentTimer), Action, state(DesiredPos, NewTimer)) :-
         cell_type(DesiredPos, Type),
         can_enter(Type)
     )),
-    NewTimer is CurrentTimer + 1.
+    NewTimer is (CurrentTimer + 1) mod 3.
 
 solve_min_length(K_min) :-
     initial_state(InitialState),
