@@ -1,9 +1,4 @@
-import game
+from game import GameUI
 
-
-def main():
-    game.run()
-
-
-if __name__ == "__main__":
-    main()
+game = GameUI()
+game.run()

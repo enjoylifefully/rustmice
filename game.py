@@ -1,7 +1,9 @@
+from dataclasses import dataclass
+from typing import final
 import pygame
 import os
-
-from prolog import generate_grid
+import logic
+from logic import Cell, Action, Grid
 
 SCREEN_WIDTH = 600
 HUD_HEIGHT = 100
@@ -13,79 +15,59 @@ FLOOR_COLOR = (210, 180, 140)
 WALL_COLOR = (139, 69, 19)
 BOX_COLOR = (160, 82, 45)
 
-SYMBOLS = {
-    "floor": " ",
-    "wall": "⬛",
-    "mouse": "🐭",
-    "cheese": "🧀",
-    "cat": "🐈",
-    "box": "📦",
-    "rat": "🐀",
-}
-
 ASSETS_PATH = "assets"
 
 
+@dataclass
+class Pos:
+    x: int
+    y: int
+
+
+@final
 class GameUI:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption("RustMice")
 
-        self.start()
-        self.reset_state()
+        self.restart()
 
-    def start(self):
-        grid, solutions = generate_grid()
-
-        self.grid = grid
-        self.solutions = solutions
-        self.side = len(grid)
-
+    def restart(self):
+        self.grid = logic.generate_grid()
+        self.solution = logic.get_solution(self.grid)
+        logic.print_grid(self.grid)
+        logic.print_solution(self.solution)
+        self.side = len(self.grid)
         self.cell_size = SCREEN_WIDTH // self.side
 
         screen_height = SCREEN_WIDTH + HUD_HEIGHT
+
         self.screen = pygame.display.set_mode(
             (SCREEN_WIDTH, screen_height), pygame.NOFRAME
         )
-
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
         self.large_font = pygame.font.Font(None, 90)
-
-        self.mouse_start_pos = self.find_start_pos()
         self.images = self.load_images()
 
-        self.has_solutions = bool(self.solutions)
-        self.reset_state()
-
-    def find_start_pos(self):
-        for r, row in enumerate(self.grid):
-            for c, cell in enumerate(row):
-                if cell == "mouse":
-                    return (r, c)
-        return (0, 0)
-
-    def reset_state(self):
-        """Reseta o estado para o início da solução atual."""
-        self.current_solution_index = 0
-        self.current_step_index = 0
-        self.mouse_pos = self.mouse_start_pos
+        self.step_index = 0
+        self.rat_pos = Pos(0, 0)
         self.running = True
 
     def load_images(self):
-        images = {}
+        images: dict[str, pygame.Surface] = {}
 
         sprite_map = {
-            "rat": "Rat.png",
-            "cheese": "Cheese.png",
-            "cat": "Cat.png",
-            "box": "Box.png",
-            "wall": "Wall.png",
-            "floor": "Floor.png",
-            "AngryCat": "AngryCat.png",
-            "AttackCat": "AttackCat.png",
-            "BoxRat": "BoxRat.png",
-            "CheeseRat": "CheeseRat.png",
+            "box": "box.png",
+            "box_rat": "box_rat.png",
+            "cat": "cat.png",
+            "cat_angry": "cat_angry.png",
+            "cat_attacking": "cat_attacking.png",
+            "cheese": "cheese.png",
+            "cheese_rat": "cheese_rat.png",
+            "floor": "floor.png",
+            "rat": "rat.png",
+            "water": "water.png",
         }
 
         for key, filename in sprite_map.items():
@@ -107,93 +89,47 @@ class GameUI:
         return images
 
     def draw_grid(self):
-        for r, row in enumerate(self.grid):
-            for c, cell_type in enumerate(row):
+        for y, row in enumerate(self.grid):
+            for x, cell in enumerate(row):
                 rect = pygame.Rect(
-                    c * self.cell_size,
-                    r * self.cell_size,
+                    x * self.cell_size,
+                    y * self.cell_size,
                     self.cell_size,
                     self.cell_size,
                 )
 
-                key_to_draw = None
-                color_fallback = None
+                key_to_draw = "floor"
 
-                if cell_type == "mouse":
-                    cell_type = "floor"
-
-                if cell_type == "cat":
-                    match self.current_step_index % 3:
-                        case 0:
-                            key_to_draw = "cat"
-                        case 1:
-                            key_to_draw = "AngryCat"
-                        case 2:
-                            key_to_draw = "AttackCat"
-
-                elif cell_type == "box":
-                    key_to_draw = "box"
-                    color_fallback = BOX_COLOR
-
-                elif cell_type == "wall":
-                    key_to_draw = "wall"
-                    color_fallback = WALL_COLOR
-
-                elif cell_type == "cheese":
-                    key_to_draw = "cheese"
-                    color_fallback = FLOOR_COLOR
-
+                if (x, y) == (self.rat_pos.x, self.rat_pos.y):
+                    match cell:
+                        case Cell.BOX:
+                            key_to_draw = "box_rat"
+                        case Cell.CHEESE:
+                            key_to_draw = "cheese_rat"
+                        case _:
+                            key_to_draw = "rat"
                 else:
-                    key_to_draw = "floor"
-                    color_fallback = FLOOR_COLOR
+                    match cell:
+                        case Cell.CAT:
+                            match self.step_index % 3:
+                                case 0:
+                                    key_to_draw = "cat"
+                                case 1:
+                                    key_to_draw = "cat_angry"
+                                case 2:
+                                    key_to_draw = "cat_attacking"
+                                case _:
+                                    pass
+                        case Cell.BOX:
+                            key_to_draw = "box"
+                        case Cell.WATER:
+                            key_to_draw = "water"
+                        case Cell.CHEESE:
+                            key_to_draw = "cheese"
+                        case _:
+                            pass
 
-                if key_to_draw in self.images:
-                    self.screen.blit(self.images[key_to_draw], rect)
-                else:
-                    if color_fallback:
-                        pygame.draw.rect(self.screen, color_fallback, rect)
-                    else:
-                        pygame.draw.rect(self.screen, FLOOR_COLOR, rect)
-
-    def draw_mouse(self):
-        r, c = self.mouse_pos
-        rect = pygame.Rect(
-            c * self.cell_size, r * self.cell_size, self.cell_size, self.cell_size
-        )
-
-        original_cell_type = self.grid[r][c]
-
-        key_to_draw = "rat"
-
-        if original_cell_type == "box":
-            key_to_draw = "BoxRat"
-        elif original_cell_type == "cheese":
-            key_to_draw = "CheeseRat"
-
-        if key_to_draw in self.images:
-            self.screen.blit(self.images[key_to_draw], rect)
-        else:
-            print(
-                f"AVISO: Sprite '{key_to_draw}' não encontrado, usando fallback de emoji."
-            )
-            emoji_font = pygame.font.Font(None, int(self.cell_size * 0.8))
-
-            emoji_to_use = SYMBOLS["mouse"]
-            if key_to_draw == "rat":
-                emoji_to_use = SYMBOLS.get("rat", SYMBOLS["mouse"])
-            elif key_to_draw == "cheese":
-                emoji_to_use = SYMBOLS.get("cheese", SYMBOLS["mouse"])
-
-            img = emoji_font.render(emoji_to_use, True, BLACK)
-            img_rect = img.get_rect(center=rect.center)
-
-            if original_cell_type == "box":
-                pygame.draw.rect(self.screen, BOX_COLOR, rect)
-            elif original_cell_type == "cheese":
-                pygame.draw.rect(self.screen, FLOOR_COLOR, rect)
-            else:
-                pygame.draw.rect(self.screen, FLOOR_COLOR, rect)
-            self.screen.blit(img, img_rect)
+                self.screen.blit(self.images[key_to_draw], rect)
 
     def draw_hud(self):
         hud_y_start = SCREEN_WIDTH
@@ -201,26 +137,18 @@ class GameUI:
         hud_rect = pygame.Rect(0, hud_y_start, SCREEN_WIDTH, HUD_HEIGHT)
         pygame.draw.rect(self.screen, GREY, hud_rect)
 
-        if self.has_solutions:
-            sol_text = (
-                f"Solução: {self.current_solution_index + 1}/{len(self.solutions)}"
-            )
+        if self.solution is not None:
+            step_text = f"passo: {self.step_index}/{len(self.solution)}"
 
-            steps_in_sol = 0
-            if self.current_solution_index < len(self.solutions):
-                steps_in_sol = len(self.solutions[self.current_solution_index])
-            step_text = f"Passo: {self.current_step_index}/{steps_in_sol}"
-
-            sol_render = self.font.render(sol_text, True, WHITE)
             step_render = self.font.render(step_text, True, WHITE)
 
-            self.screen.blit(sol_render, (20, hud_y_start + 20))
             self.screen.blit(step_render, (20, hud_y_start + 55))
 
-            help_text_1 = "ESPAÇO: Próximo Passo"
-            help_text_2 = "N: Próxima Solução"
+            help_text_1 = "espaço: próximo passo"
+            help_text_2 = "m: novo mapa"
             help_render_1 = self.font.render(help_text_1, True, WHITE)
             help_render_2 = self.font.render(help_text_2, True, WHITE)
+
             self.screen.blit(
                 help_render_1,
                 (SCREEN_WIDTH - help_render_1.get_width() - 20, hud_y_start + 20),
@@ -230,7 +158,7 @@ class GameUI:
                 (SCREEN_WIDTH - help_render_2.get_width() - 20, hud_y_start + 55),
             )
         else:
-            no_sol_text = "NENHUMA SOLUÇÃO ENCONTRADA"
+            no_sol_text = "nenhuma solução encontrada"
 
             no_sol_render = self.font.render(no_sol_text, True, (255, 100, 100))
             no_sol_rect = no_sol_render.get_rect(
@@ -246,42 +174,30 @@ class GameUI:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
                 if event.key == pygame.K_m:
-                    self.start()
+                    self.restart()
+                if event.key == pygame.K_SPACE:
+                    self.update_rat_pos()
 
-                if self.has_solutions:
-                    if event.key == pygame.K_SPACE:
-                        self.advance_step()
-                    if event.key == pygame.K_n:
-                        self.next_solution()
-
-    def advance_step(self):
-        if not self.has_solutions:
+    def update_rat_pos(self):
+        if self.solution is None:
             return
 
-        current_solution = self.solutions[self.current_solution_index]
-        if self.current_step_index < len(current_solution):
-            action = current_solution[self.current_step_index]
-            r, c = self.mouse_pos
-            if action == "up":
-                self.mouse_pos = (r - 1, c)
-            elif action == "down":
-                self.mouse_pos = (r + 1, c)
-            elif action == "left":
-                self.mouse_pos = (r, c - 1)
-            elif action == "right":
-                self.mouse_pos = (r, c + 1)
+        self.step_index = (self.step_index + 1) % (len(self.solution) + 1)
 
-            self.current_step_index += 1  # O Timer avança
+        if self.step_index == 0:
+            self.rat_pos = Pos(0, 0)
+        else:
+            action = self.solution[self.step_index - 1]
 
-    def next_solution(self):
-        if not self.has_solutions:
-            return
-
-        self.current_solution_index = (self.current_solution_index + 1) % len(
-            self.solutions
-        )
-        self.current_step_index = 0
-        self.mouse_pos = self.mouse_start_pos
+            match action:
+                case Action.UP:
+                    self.rat_pos.y -= 1
+                case Action.DOWN:
+                    self.rat_pos.y += 1
+                case Action.LEFT:
+                    self.rat_pos.x -= 1
+                case Action.RIGHT:
+                    self.rat_pos.x += 1
 
     def run(self):
         while self.running:
@@ -289,15 +205,9 @@ class GameUI:
 
             self.screen.fill(BLACK)
             self.draw_grid()
-            self.draw_mouse()
             self.draw_hud()
 
             pygame.display.flip()
             self.clock.tick(30)
 
         pygame.quit()
-
-
-def run():
-    game = GameUI()
-    game.run()
