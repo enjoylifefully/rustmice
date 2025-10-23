@@ -49,34 +49,33 @@ move(state(CurrentPos, CurrentTimer), Action, state(DesiredPos, NewTimer)) :-
     )),
     NewTimer is (CurrentTimer + 1) mod 3.
 
+solve(Path) :-
+    solve_bfs(Path).
 
-    solve(Path) :-
-        solve_bfs(Path).
+solve_bfs(Path) :-
+    initial_state(Initial),
+    bfs([[Initial, []]], [Initial], RevPath),
+    reverse(RevPath, Path).
 
-    solve_bfs(Path) :-
-        initial_state(Initial),
-        bfs([[Initial, []]], [Initial], RevPath),
-        reverse(RevPath, Path).
+bfs([[State, RevPath] | _], _, RevPath) :-
+    victory_state(State), !.
 
-    bfs([[State, RevPath] | _], _, RevPath) :-
-        victory_state(State), !.
-
-    bfs([[State, RevPath] | Queue], Visited, Sol) :-
-        findall(
-            [Next, [Action | RevPath]],
-            (
-                action(Action),
-                move(State, Action, Next),
-                \+ deadly_state(Next),
-                \+ member(Next, Visited)
-            ),
-            Succs
+bfs([[State, RevPath] | Queue], Visited, Sol) :-
+    findall(
+        [Next, [Action | RevPath]],
+        (
+            action(Action),
+            move(State, Action, Next),
+            \+ deadly_state(Next),
+            \+ member(Next, Visited)
         ),
-        append(Queue, Succs, NewQueue),
-        extract_states(Succs, NewStates),
-        append(Visited, NewStates, Vis2),
-        bfs(NewQueue, Vis2, Sol).
+        Succs
+    ),
+    append(Queue, Succs, NewQueue),
+    extract_states(Succs, NewStates),
+    append(Visited, NewStates, Vis2),
+    bfs(NewQueue, Vis2, Sol).
 
-    extract_states([], []).
-    extract_states([[S, _] | T], [S | Ts]) :-
-        extract_states(T, Ts).
+extract_states([], []).
+extract_states([[S, _] | T], [S | Ts]) :-
+    extract_states(T, Ts).
