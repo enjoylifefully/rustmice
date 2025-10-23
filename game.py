@@ -3,7 +3,7 @@ from typing import final
 import pygame
 import os
 import logic
-from logic import Cell, Action, Grid
+from logic import Cell, Action, Grid, Solution
 
 SCREEN_WIDTH = 600
 HUD_HEIGHT = 100
@@ -138,10 +138,24 @@ class GameUI:
         pygame.draw.rect(self.screen, GREY, hud_rect)
 
         if self.solution is not None:
+            action_text = "fim"
+            if self.step_index < len(self.solution):
+                match self.solution[self.step_index]:
+                    case Action.UP:
+                        action_text = "próxima ação: cima"
+                    case Action.DOWN:
+                        action_text = "próxima ação: baixo"
+                    case Action.LEFT:
+                        action_text = "próxima ação: esquerda"
+                    case Action.RIGHT:
+                        action_text = "próxima ação: direita"
+
             step_text = f"passo: {self.step_index}/{len(self.solution)}"
 
+            action_render = self.font.render(action_text, True, WHITE)
             step_render = self.font.render(step_text, True, WHITE)
 
+            self.screen.blit(action_render, (20, hud_y_start + 20))
             self.screen.blit(step_render, (20, hud_y_start + 55))
 
             help_text_1 = "espaço: próximo passo"
